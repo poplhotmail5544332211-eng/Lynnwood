@@ -1,0 +1,1258 @@
+<!DOCTYPE html>
+<html lang="th" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>สภ. LYNNWOOD | ระบบบันทึกการออกตรวจ One State</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts: Kanit & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Kanit', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        tactical: {
+                            950: '#040812',
+                            900: '#091124',
+                            800: '#0f1c38',
+                            700: '#172a52',
+                            gold: '#f59e0b',
+                            goldLight: '#fbbf24',
+                            cyan: '#06b6d4',
+                            sirenRed: '#ef4444',
+                            sirenBlue: '#3b82f6'
+                        }
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'siren-flash': 'sirenFlash 1.2s ease-in-out infinite',
+                        'slide-down': 'slideDown 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                    },
+                    keyframes: {
+                        sirenFlash: {
+                            '0%, 100%': { boxShadow: 'inset 0 0 28px rgba(239, 68, 68, 0.55), 0 0 18px rgba(239, 68, 68, 0.35)' },
+                            '50%': { boxShadow: 'inset 0 0 28px rgba(59, 130, 246, 0.55), 0 0 18px rgba(59, 130, 246, 0.35)' }
+                        },
+                        slideDown: {
+                            '0%': { transform: 'translateY(-100%)', opacity: '0' },
+                            '100%': { transform: 'translateY(0)', opacity: '1' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Custom Tactical Scrollbar & Safe Area Support */
+        :root {
+            --sat: env(safe-area-inset-top, 0px);
+            --sab: env(safe-area-inset-bottom, 0px);
+        }
+        body {
+            background-color: #040812;
+            background-image: 
+                radial-gradient(circle at 15% 15%, rgba(23, 42, 82, 0.45) 0%, transparent 45%),
+                radial-gradient(circle at 85% 85%, rgba(245, 158, 11, 0.12) 0%, transparent 45%),
+                linear-gradient(rgba(15, 28, 56, 0.25) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(15, 28, 56, 0.25) 1px, transparent 1px);
+            background-size: 100% 100%, 100% 100%, 28px 28px, 28px 28px;
+            color: #f1f5f9;
+            padding-top: var(--sat);
+            padding-bottom: calc(var(--sab) + 76px);
+            -webkit-tap-highlight-color: transparent;
+            overflow-x: hidden;
+        }
+
+        /* Glassmorphism Cards */
+        .tactical-card {
+            background: rgba(9, 17, 36, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(59, 130, 246, 0.22);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+        }
+
+        .gold-border-glow {
+            border-color: rgba(245, 158, 11, 0.45);
+            box-shadow: 0 0 20px rgba(245, 158, 11, 0.12);
+        }
+
+        /* Custom Range Slider */
+        input[type="range"] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        input[type="range"]::-webkit-slider-runnable-track {
+            height: 8px;
+            border-radius: 999px;
+            background: #172a52;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 22px;
+            width: 22px;
+            border-radius: 50%;
+            background: #f59e0b;
+            border: 2px solid #fff;
+            margin-top: -7px;
+            box-shadow: 0 0 10px rgba(245, 158, 11, 0.8);
+            cursor: pointer;
+        }
+
+        /* Screen Edge Siren Overlay */
+        #sirenOverlay {
+            pointer-events: none;
+            position: fixed;
+            inset: 0;
+            z-index: 9998;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        #sirenOverlay.active {
+            opacity: 1;
+            animation: sirenFlash 0.8s ease-in-out infinite;
+        }
+
+        /* Hide scrollbars on horizontal filter pills */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="antialiased selection:bg-amber-500 selection:text-slate-950">
+
+    <!-- Siren Visual Alert Overlay -->
+    <div id="sirenOverlay"></div>
+
+    <!-- Floating Toast Notification Banner -->
+    <div id="toastContainer" class="fixed top-3 left-3 right-3 z-[9999] flex flex-col gap-2 pointer-events-none max-w-lg mx-auto"></div>
+
+    <!-- Top Command Header -->
+    <header class="sticky top-0 z-40 tactical-card border-b border-amber-500/30 px-4 py-3">
+        <div class="max-w-3xl mx-auto flex items-center justify-between gap-2">
+            <div class="flex items-center gap-3">
+                <!-- Tactical Police Shield Emblem -->
+                <div class="relative w-11 h-11 rounded-xl bg-gradient-to-br from-amber-400 via-amber-500 to-amber-700 p-[2px] shadow-lg shadow-amber-500/20 flex-shrink-0">
+                    <div class="w-full h-full bg-tactical-950 rounded-[10px] flex items-center justify-center">
+                        <i class="fa-solid fa-shield-halved text-amber-400 text-xl"></i>
+                    </div>
+                    <span id="headerSirenDot" class="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-emerald-400 border-2 border-tactical-950 animate-ping"></span>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="text-base sm:text-lg font-bold tracking-wide text-white leading-tight">
+                            สภ. <span class="text-amber-400">LYNNWOOD</span>
+                        </h1>
+                        <span class="px-1.5 py-0.5 text-[10px] font-mono font-bold uppercase rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                            ONE STATE
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
+                        <span id="syncStatusDot" class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                        <span id="syncStatusText" class="font-mono text-[11px]">กำลังเชื่อมต่อศูนย์วิทยุ...</span>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Right Actions: Sound Toggle & Copy All Summary -->
+            <div class="flex items-center gap-2">
+                <button id="soundToggleBtn" type="button" title="เปิด/ปิดเสียงวิทยุแจ้งเตือน"
+                    class="w-10 h-10 rounded-xl bg-tactical-800/90 border border-blue-500/30 text-amber-400 flex items-center justify-center active:scale-95 transition">
+                    <i id="soundIcon" class="fa-solid fa-volume-high text-sm"></i>
+                </button>
+                <button id="copyAllLineBtn" type="button"
+                    class="px-3 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white text-xs font-semibold shadow-lg shadow-emerald-600/25 flex items-center gap-1.5 active:scale-95 transition">
+                    <i class="fa-brands fa-line text-base"></i>
+                    <span class="hidden sm:inline">สรุปส่ง</span><span>LINE</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-3xl mx-auto px-3 sm:px-4 pt-4 space-y-5">
+
+        <!-- SECTION 1: LIVE UNIT LEADERBOARD PODIUM (อันดับ 1, 2, 3) -->
+        <section class="tactical-card gold-border-glow rounded-2xl p-4 relative overflow-hidden">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-trophy text-amber-400 text-base"></i>
+                    <h2 class="text-sm sm:text-base font-bold text-white tracking-wide">จัดอันดับหน่วยงานดีเด่น (REAL-TIME)</h2>
+                </div>
+                <span class="text-[11px] font-mono text-slate-400 bg-tactical-800 px-2 py-0.5 rounded-lg border border-slate-700">
+                    <i class="fa-solid fa-satellite-dish text-cyan-400 mr-1"></i>7 หน่วยงาน
+                </span>
+            </div>
+
+            <!-- 3-Tier Podium Display -->
+            <div id="podiumContainer" class="grid grid-cols-3 gap-2 sm:gap-3 items-end pt-3 pb-1">
+                <!-- Populated dynamically by JS -->
+                <div class="col-span-3 text-center py-6 text-slate-400 text-xs">กำลังประมวลผลคะแนนหน่วยงาน...</div>
+            </div>
+
+            <!-- Collapsible All 7 Units Ranking Bar -->
+            <details class="mt-3 pt-2 border-t border-slate-800/80 group">
+                <summary class="list-none flex items-center justify-between text-xs text-amber-400/90 cursor-pointer select-none py-1">
+                    <span><i class="fa-solid fa-list-ol mr-1.5"></i>ดูอันดับคะแนนครบทั้ง 7 หน่วยงาน</span>
+                    <i class="fa-solid fa-chevron-down transition-transform group-open:rotate-180"></i>
+                </summary>
+                <div id="allUnitsList" class="mt-2 space-y-1.5"></div>
+            </details>
+        </section>
+
+        <!-- Navigation Tabs (Form vs Feed) for Mobile Ergonomics -->
+        <div class="grid grid-cols-2 gap-2 p-1 rounded-2xl bg-tactical-900/90 border border-blue-500/20">
+            <button id="tabBtnForm" type="button" onclick="switchTab('form')"
+                class="py-2.5 px-3 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-md transition">
+                <i class="fa-solid fa-pen-to-square"></i>
+                <span>ลงบันทึกออกตรวจ</span>
+            </button>
+            <button id="tabBtnFeed" type="button" onclick="switchTab('feed')"
+                class="py-2.5 px-3 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 text-slate-300 hover:text-white transition relative">
+                <i class="fa-solid fa-radio"></i>
+                <span>ฟีดรายงานสด</span>
+                <span id="feedBadgeCount" class="px-1.5 py-0.2 text-[10px] font-mono rounded-full bg-blue-600 text-white">0</span>
+            </button>
+        </div>
+
+        <!-- SECTION 2: PATROL & EVALUATION FORM -->
+        <section id="sectionForm" class="tactical-card rounded-2xl p-4 sm:p-5 space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div class="flex items-center gap-2">
+                    <div class="w-2 h-5 bg-amber-400 rounded-full"></div>
+                    <h2 class="text-base font-bold text-white">แบบฟอร์มบันทึกการออกตรวจพื้นที่</h2>
+                </div>
+                <span class="text-[11px] font-mono text-cyan-400">AUTO-SYNC</span>
+            </div>
+
+            <form id="patrolForm" class="space-y-4">
+                <!-- Officer Name & Unit Selection -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1.5">
+                            <i class="fa-solid fa-user-shield text-amber-400 mr-1"></i>ชื่อเจ้าหน้าที่ผู้ลงบันทึก *
+                        </label>
+                        <input type="text" id="officerName" required placeholder="เช่น ร.ต.อ. สมชาย / ชื่อในเกม"
+                            class="w-full px-3.5 py-2.5 rounded-xl bg-tactical-950/90 border border-slate-700 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 text-sm text-white placeholder-slate-500 outline-none transition">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1.5">
+                            <i class="fa-solid fa-building-shield text-amber-400 mr-1"></i>หน่วยงานที่ปฏิบัติหน้าที่ *
+                        </label>
+                        <select id="unitSelect" required
+                            class="w-full px-3.5 py-2.5 rounded-xl bg-tactical-950/90 border border-slate-700 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 text-sm text-white outline-none transition">
+                            <option value="กองอำนวยการ">🏛️ กองอำนวยการ</option>
+                            <option value="CIA">🕵️ CIA</option>
+                            <option value="FBI">🦅 FBI</option>
+                            <option value="หน่วยสวาท (SWAT)">🛡️ หน่วยสวาท (SWAT)</option>
+                            <option value="PPU">🚓 PPU</option>
+                            <option value="สองศูนย์ (20)">📡 สองศูนย์ (20)</option>
+                            <option value="จเรตำรวจ">⚖️ จเรตำรวจ</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Patrol Area Quick Chips + Custom Input -->
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1.5">
+                        <i class="fa-solid fa-location-crosshairs text-amber-400 mr-1"></i>พื้นที่ออกตรวจ *
+                    </label>
+                    <div class="flex flex-wrap gap-1.5 mb-2" id="areaQuickChips">
+                        <button type="button" onclick="setArea('จุดตรวจหลัก สภ.Lynnwood')" class="area-chip px-2.5 py-1 rounded-lg text-[11px] bg-tactical-800 hover:bg-amber-500/20 border border-slate-700 hover:border-amber-400 text-slate-200 transition">จุดตรวจหลัก</button>
+                        <button type="button" onclick="setArea('ธนาคารกลาง (Central Bank)')" class="area-chip px-2.5 py-1 rounded-lg text-[11px] bg-tactical-800 hover:bg-amber-500/20 border border-slate-700 hover:border-amber-400 text-slate-200 transition">ธนาคารกลาง</button>
+                        <button type="button" onclick="setArea('ท่าเรือขนส่ง (Harbor)')" class="area-chip px-2.5 py-1 rounded-lg text-[11px] bg-tactical-800 hover:bg-amber-500/20 border border-slate-700 hover:border-amber-400 text-slate-200 transition">ท่าเรือ</button>
+                        <button type="button" onclick="setArea('สนามบิน (Airport)')" class="area-chip px-2.5 py-1 rounded-lg text-[11px] bg-tactical-800 hover:bg-amber-500/20 border border-slate-700 hover:border-amber-400 text-slate-200 transition">สนามบิน</button>
+                        <button type="button" onclick="setArea('ย่านธุรกิจ & ร้านค้า')" class="area-chip px-2.5 py-1 rounded-lg text-[11px] bg-tactical-800 hover:bg-amber-500/20 border border-slate-700 hover:border-amber-400 text-slate-200 transition">ย่านธุรกิจ</button>
+                        <button type="button" onclick="setArea('คุกกลาง (State Prison)')" class="area-chip px-2.5 py-1 rounded-lg text-[11px] bg-tactical-800 hover:bg-amber-500/20 border border-slate-700 hover:border-amber-400 text-slate-200 transition">คุกกลาง</button>
+                    </div>
+                    <input type="text" id="patrolArea" required placeholder="เลือกด้านบน หรือพิมพ์ชื่อพื้นที่ออกตรวจ..."
+                        class="w-full px-3.5 py-2.5 rounded-xl bg-tactical-950/90 border border-slate-700 focus:border-amber-400 text-sm text-white placeholder-slate-500 outline-none transition">
+                </div>
+
+                <!-- Timestamp Recording -->
+                <div class="bg-tactical-950/70 p-3 rounded-xl border border-slate-800 space-y-2.5">
+                    <div class="flex items-center justify-between">
+                        <label class="text-xs font-medium text-slate-300">
+                            <i class="fa-regular fa-clock text-cyan-400 mr-1"></i>เวลาออกตรวจ (เริ่ม - สิ้นสุด)
+                        </label>
+                        <button type="button" onclick="fillCurrentTime()"
+                            class="px-2.5 py-1 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-cyan-300 text-[11px] font-medium flex items-center gap-1 active:scale-95 transition">
+                            <i class="fa-solid fa-stopwatch"></i> ดึงเวลาปัจจุบัน
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2.5">
+                        <div>
+                            <span class="block text-[10px] text-slate-400 mb-1">เวลาเริ่มตรวจ</span>
+                            <input type="time" id="startTime" required
+                                class="w-full px-3 py-2 rounded-lg bg-tactical-900 border border-slate-700 text-xs sm:text-sm font-mono text-white outline-none focus:border-cyan-400">
+                        </div>
+                        <div>
+                            <span class="block text-[10px] text-slate-400 mb-1">เวลาสิ้นสุด / ปัจจุบัน</span>
+                            <input type="time" id="endTime" required
+                                class="w-full px-3 py-2 rounded-lg bg-tactical-900 border border-slate-700 text-xs sm:text-sm font-mono text-white outline-none focus:border-cyan-400">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dual Score Sliders (1-10 each) -->
+                <div class="bg-tactical-950/70 p-3.5 rounded-xl border border-amber-500/20 space-y-3.5">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-semibold text-amber-400">
+                            <i class="fa-solid fa-star mr-1"></i>ประเมินผลการปฏิบัติหน้าที่
+                        </span>
+                        <span id="totalScoreBadge" class="px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 font-mono text-xs font-bold">
+                            รวม 20 / 20 คะแนน
+                        </span>
+                    </div>
+
+                    <!-- Score 1: Area Orderliness -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-slate-300">1. ความเรียบร้อยของพื้นที่</span>
+                            <span class="font-mono font-bold text-cyan-400"><span id="areaScoreVal">10</span> / 10</span>
+                        </div>
+                        <input type="range" id="areaScore" min="1" max="10" value="10" oninput="updateScoreDisplay()" class="w-full">
+                    </div>
+
+                    <!-- Score 2: Unit Readiness -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-slate-300">2. ความพร้อมและวินัยของหน่วยงาน</span>
+                            <span class="font-mono font-bold text-amber-400"><span id="unitScoreVal">10</span> / 10</span>
+                        </div>
+                        <input type="range" id="unitScore" min="1" max="10" value="10" oninput="updateScoreDisplay()" class="w-full">
+                    </div>
+                </div>
+
+                <!-- Event Notes -->
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1.5">
+                        <i class="fa-solid fa-file-lines text-amber-400 mr-1"></i>หมายเหตุ / รายละเอียดเหตุการณ์
+                    </label>
+                    <textarea id="patrolNotes" rows="2" placeholder="เช่น เหตุการณ์ปกติ ไม่พบสิ่งผิดกฎหมาย / ตั้งด่านสกัดจับ..."
+                        class="w-full px-3.5 py-2.5 rounded-xl bg-tactical-950/90 border border-slate-700 focus:border-amber-400 text-sm text-white placeholder-slate-500 outline-none transition"></textarea>
+                </div>
+
+                <!-- Image Picker + Client-side Canvas Compression -->
+                <div class="bg-tactical-950/70 p-3.5 rounded-xl border border-dashed border-blue-500/40 space-y-2.5">
+                    <div class="flex items-center justify-between">
+                        <label class="text-xs font-medium text-slate-200 flex items-center gap-1.5">
+                            <i class="fa-solid fa-camera text-amber-400"></i>
+                            <span>แนบภาพแคปหน้าจอ / แกลเลอรี</span>
+                        </label>
+                        <span class="text-[10px] font-mono text-emerald-400">บีบอัดอัตโนมัติ (iOS/Android)</span>
+                    </div>
+
+                    <label for="imageInput"
+                        class="flex flex-col items-center justify-center py-3 px-4 rounded-xl bg-tactical-900/90 hover:bg-tactical-800 border border-slate-700 cursor-pointer transition active:scale-[0.99]">
+                        <i class="fa-solid fa-cloud-arrow-up text-xl text-cyan-400 mb-1"></i>
+                        <span class="text-xs text-slate-300 font-medium">แตะเพื่อเลือกรูปภาพจากแกลเลอรี</span>
+                        <span class="text-[10px] text-slate-500 mt-0.5">รองรับภาพแคปหน้าจอเกม One State ทุกขนาด</span>
+                        <input type="file" id="imageInput" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
+                    </label>
+
+                    <!-- Compression Stats & Preview -->
+                    <div id="imagePreviewBox" class="hidden space-y-2 pt-1">
+                        <div class="relative rounded-xl overflow-hidden border border-slate-700 bg-black/50">
+                            <img id="compressedPreviewImg" src="" alt="Preview" class="w-full max-h-56 object-contain mx-auto">
+                            <button type="button" onclick="clearImage()"
+                                class="absolute top-2 right-2 w-8 h-8 rounded-full bg-red-600/90 text-white flex items-center justify-center shadow-lg active:scale-90">
+                                <i class="fa-solid fa-xmark text-sm"></i>
+                            </button>
+                        </div>
+                        <div class="flex items-center justify-between text-[11px] font-mono bg-tactical-900 px-3 py-1.5 rounded-lg border border-slate-800">
+                            <span class="text-slate-400">เดิม: <strong id="origSizeText" class="text-slate-200">-</strong></span>
+                            <i class="fa-solid fa-arrow-right text-amber-400"></i>
+                            <span class="text-emerald-400">บีบอัดแล้ว: <strong id="compSizeText">-</strong></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <button type="submit" id="submitBtn"
+                    class="w-full py-3.5 px-5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-bold text-sm sm:text-base shadow-lg shadow-amber-500/25 flex items-center justify-center gap-2 active:scale-[0.98] transition">
+                    <i class="fa-solid fa-paper-plane"></i>
+                    <span>บันทึกและซิงค์ข้อมูลทันที</span>
+                </button>
+            </form>
+        </section>
+
+        <!-- SECTION 3: LIVE PATROL FEED & LINE SHARE -->
+        <section id="sectionFeed" class="space-y-3">
+            <!-- Unit Filter Pills -->
+            <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1" id="unitFilterBar">
+                <button type="button" onclick="setFilterUnit('ALL')" data-unit="ALL"
+                    class="filter-pill active px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap bg-amber-500 text-slate-950 transition">
+                    ทั้งหมด
+                </button>
+                <button type="button" onclick="setFilterUnit('กองอำนวยการ')" data-unit="กองอำนวยการ"
+                    class="filter-pill px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap bg-tactical-900 text-slate-300 border border-slate-800 transition">
+                    กองอำนวยการ
+                </button>
+                <button type="button" onclick="setFilterUnit('CIA')" data-unit="CIA"
+                    class="filter-pill px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap bg-tactical-900 text-slate-300 border border-slate-800 transition">
+                    CIA
+                </button>
+                <button type="button" onclick="setFilterUnit('FBI')" data-unit="FBI"
+                    class="filter-pill px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap bg-tactical-900 text-slate-300 border border-slate-800 transition">
+                    FBI
+                </button>
+                <button type="button" onclick="setFilterUnit('หน่วยสวาท (SWAT)')" data-unit="หน่วยสวาท (SWAT)"
+                    class="filter-pill px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap bg-tactical-900 text-slate-300 border border-slate-800 transition">
+                    หน่วยสวาท
+                </button>
+                <button type="button" onclick="setFilterUnit('PPU')" data-unit="PPU"
+                    class="filter-pill px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap bg-tactical-900 text-slate-300 border border-slate-800 transition">
+                    PPU
+                </button>
+                <button type="button" onclick="setFilterUnit('สองศูนย์ (20)')" data-unit="สองศูนย์ (20)"
+                    class="filter-pill px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap bg-tactical-900 text-slate-300 border border-slate-800 transition">
+                    สองศูนย์
+                </button>
+                <button type="button" onclick="setFilterUnit('จเรตำรวจ')" data-unit="จเรตำรวจ"
+                    class="filter-pill px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap bg-tactical-900 text-slate-300 border border-slate-800 transition">
+                    จเรตำรวจ
+                </button>
+            </div>
+
+            <!-- Live Feed Cards Container -->
+            <div id="patrolFeedList" class="space-y-3">
+                <div class="tactical-card rounded-2xl p-8 text-center text-slate-400 text-sm">
+                    <i class="fa-solid fa-spinner fa-spin text-amber-400 text-2xl mb-2"></i>
+                    <p>กำลังซิงค์ข้อมูลการออกตรวจจากศูนย์วิทยุ...</p>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Fullscreen Image Lightbox Modal -->
+    <div id="imageModal" class="fixed inset-0 z-[9990] hidden bg-black/95 backdrop-blur-md flex flex-col items-center justify-center p-4" onclick="closeImageModal()">
+        <button type="button" class="absolute top-4 right-4 w-11 h-11 rounded-full bg-slate-800 text-white flex items-center justify-center border border-slate-600">
+            <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+        <img id="modalFullImage" src="" alt="Full Patrol Evidence" class="max-w-full max-h-[82vh] rounded-xl border border-amber-500/40 shadow-2xl object-contain" onclick="event.stopPropagation()">
+        <p id="modalCaption" class="text-xs text-slate-300 mt-3 text-center font-mono"></p>
+    </div>
+
+    <!-- Custom Confirmation Modal (No browser confirm()) -->
+    <div id="deleteModal" class="fixed inset-0 z-[9995] hidden bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="tactical-card border-red-500/40 rounded-2xl p-5 max-w-sm w-full space-y-4">
+            <div class="flex items-center gap-3 text-red-400">
+                <i class="fa-solid fa-triangle-exclamation text-2xl"></i>
+                <h3 class="text-base font-bold text-white">ยืนยันการลบบันทึก?</h3>
+            </div>
+            <p class="text-xs text-slate-300 leading-relaxed">รายการออกตรวจนี้จะถูกลบออกจากระบบของเจ้าหน้าที่ทุกคนทันที คุณต้องการดำเนินการต่อหรือไม่?</p>
+            <div class="grid grid-cols-2 gap-2.5 pt-1">
+                <button type="button" onclick="closeDeleteModal()" class="py-2.5 rounded-xl bg-slate-800 text-slate-200 text-xs font-semibold">ยกเลิก</button>
+                <button type="button" id="confirmDeleteBtn" class="py-2.5 rounded-xl bg-red-600 text-white text-xs font-semibold">ลบรายการ</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK & Application Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, increment } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // ==========================================
+        // 1. STATE & CONSTANTS
+        // ==========================================
+        const UNITS = [
+            { name: 'กองอำนวยการ', icon: '🏛️', short: 'กองอำนวยการ' },
+            { name: 'CIA', icon: '🕵️', short: 'CIA' },
+            { name: 'FBI', icon: '🦅', short: 'FBI' },
+            { name: 'หน่วยสวาท (SWAT)', icon: '🛡️', short: 'SWAT' },
+            { name: 'PPU', icon: '🚓', short: 'PPU' },
+            { name: 'สองศูนย์ (20)', icon: '📡', short: 'สองศูนย์' },
+            { name: 'จเรตำรวจ', icon: '⚖️', short: 'จเรตำรวจ' }
+        ];
+
+        let db = null;
+        let auth = null;
+        let currentUser = null;
+        let isFirebaseReady = false;
+        let allLogs = [];
+        let activeFilterUnit = 'ALL';
+        let compressedBase64 = null;
+        let soundEnabled = true;
+        let isInitialSnapshot = true;
+        let pendingDeleteId = null;
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'lynnwood-police-onestate';
+
+        // ==========================================
+        // 2. WEB AUDIO API (POLICE RADIO & ALERT SFX)
+        // ==========================================
+        let audioCtx = null;
+        function getAudioContext() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (AudioContext) audioCtx = new AudioContext();
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            return audioCtx;
+        }
+
+        function playRadioBeep(type = 'notify') {
+            if (!soundEnabled) return;
+            try {
+                const ctx = getAudioContext();
+                if (!ctx) return;
+
+                const now = ctx.currentTime;
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
+                if (type === 'success') {
+                    // Police Radio Double-Chirp
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(880, now);
+                    osc.frequency.setValueAtTime(1174.66, now + 0.09);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+                    osc.start(now);
+                    osc.stop(now + 0.26);
+                } else if (type === 'incoming') {
+                    // Incoming Dispatch Alert Tone
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(660, now);
+                    osc.frequency.setValueAtTime(880, now + 0.12);
+                    osc.frequency.setValueAtTime(1046.5, now + 0.24);
+                    gain.gain.setValueAtTime(0.18, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+                    osc.start(now);
+                    osc.stop(now + 0.46);
+                } else {
+                    // Subtle UI Click
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(720, now);
+                    gain.gain.setValueAtTime(0.08, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+                    osc.start(now);
+                    osc.stop(now + 0.09);
+                }
+            } catch (e) {
+                console.warn('Audio playback skipped:', e);
+            }
+        }
+
+        function triggerSirenVisual() {
+            const overlay = document.getElementById('sirenOverlay');
+            overlay.classList.add('active');
+            setTimeout(() => {
+                overlay.classList.remove('active');
+            }, 2600);
+        }
+
+        function showToast(title, message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            const borderClass = type === 'success' ? 'border-emerald-500/60' : type === 'alert' ? 'border-amber-400/80' : 'border-cyan-500/60';
+            const iconHtml = type === 'success'
+                ? '<i class="fa-solid fa-circle-check text-emerald-400 text-lg"></i>'
+                : type === 'alert'
+                ? '<i class="fa-solid fa-walkie-talkie text-amber-400 text-lg animate-bounce"></i>'
+                : '<i class="fa-solid fa-circle-info text-cyan-400 text-lg"></i>';
+
+            toast.className = `tactical-card ${borderClass} rounded-xl p-3 shadow-2xl flex items-start gap-3 animate-slide-down pointer-events-auto`;
+            toast.innerHTML = `
+                <div class="mt-0.5">${iconHtml}</div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-xs font-bold text-white truncate">${escapeHTML(title)}</p>
+                    <p class="text-[11px] text-slate-300 mt-0.5 line-clamp-2">${escapeHTML(message)}</p>
+                </div>
+            `;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(-12px)';
+                toast.style.transition = 'all 0.3s ease';
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+
+        // ==========================================
+        // 3. FIREBASE REAL-TIME SYNC SETUP
+        // ==========================================
+        async function initRealtimeSync() {
+            const statusDot = document.getElementById('syncStatusDot');
+            const statusText = document.getElementById('syncStatusText');
+
+            try {
+                if (typeof __firebase_config === 'undefined' || !__firebase_config) {
+                    throw new Error('Missing Firebase Config');
+                }
+                const firebaseConfig = JSON.parse(__firebase_config);
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                // Rule 3: Auth before queries
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    const cred = await signInWithCustomToken(auth, __initial_auth_token);
+                    currentUser = cred.user;
+                } else {
+                    const cred = await signInAnonymously(auth);
+                    currentUser = cred.user;
+                }
+
+                if (!currentUser) return;
+                isFirebaseReady = true;
+
+                statusDot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse';
+                statusText.textContent = 'ONLINE • ซิงค์ข้อมูลเรียลไทม์';
+                statusText.classList.replace('text-slate-400', 'text-emerald-400');
+
+                // Rule 1 & 2: Strict Public Collection Path, no complex queries
+                const logsRef = collection(db, 'artifacts', appId, 'public', 'data', 'patrol_logs');
+
+                onSnapshot(logsRef, (snapshot) => {
+                    const items = [];
+                    snapshot.forEach((docSnap) => {
+                        items.push({ id: docSnap.id, ...docSnap.data() });
+                    });
+
+                    // Sort newest first in memory
+                    items.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+                    // Detect new incoming report from teammates
+                    if (!isInitialSnapshot && items.length > allLogs.length) {
+                        const newest = items[0];
+                        if (newest && newest.authorUid !== currentUser.uid) {
+                            playRadioBeep('incoming');
+                            triggerSirenVisual();
+                            showToast(
+                                `📡 รายงานใหม่จาก ${newest.officerName}`,
+                                `[${newest.unit}] ออกตรวจ ${newest.area} (${newest.totalScore}/20 คะแนน)`,
+                                'alert'
+                            );
+                        }
+                    }
+
+                    isInitialSnapshot = false;
+                    allLogs = items;
+                    renderAll();
+                }, (err) => {
+                    console.error('Firestore Snapshot Error:', err);
+                    statusDot.className = 'w-2 h-2 rounded-full bg-red-500';
+                    statusText.textContent = 'การเชื่อมต่อขัดข้อง';
+                });
+
+            } catch (error) {
+                console.warn('Running in standalone preview mode:', error);
+                statusDot.className = 'w-2 h-2 rounded-full bg-amber-400';
+                statusText.textContent = 'OFFLINE DEMO MODE';
+                renderAll();
+            }
+        }
+
+        // ==========================================
+        // 4. CLIENT-SIDE IMAGE COMPRESSION (CANVAS)
+        // ==========================================
+        window.handleImageUpload = function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const origKB = (file.size / 1024).toFixed(1);
+            document.getElementById('origSizeText').textContent = origKB > 1024 ? `${(origKB / 1024).toFixed(2)} MB` : `${origKB} KB`;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 760;
+                    const MAX_HEIGHT = 760;
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > MAX_WIDTH) {
+                            height = Math.round((height * MAX_WIDTH) / width);
+                            width = MAX_WIDTH;
+                        }
+                    } else {
+                        if (height > MAX_HEIGHT) {
+                            width = Math.round((width * MAX_HEIGHT) / height);
+                            height = MAX_HEIGHT;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    // Compress to JPEG 0.65 quality for fast Firestore sync
+                    compressedBase64 = canvas.toDataURL('image/jpeg', 0.65);
+
+                    // Calculate approximate compressed size in KB
+                    const base64Length = compressedBase64.length - 'data:image/jpeg;base64,'.length;
+                    const compKB = ((base64Length * 3) / 4 / 1024).toFixed(1);
+
+                    document.getElementById('compressedPreviewImg').src = compressedBase64;
+                    document.getElementById('compSizeText').textContent = `${compKB} KB`;
+                    document.getElementById('imagePreviewBox').classList.remove('hidden');
+                    playRadioBeep('click');
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        };
+
+        window.clearImage = function() {
+            compressedBase64 = null;
+            document.getElementById('imageInput').value = '';
+            document.getElementById('imagePreviewBox').classList.add('hidden');
+            document.getElementById('compressedPreviewImg').src = '';
+        };
+
+        // ==========================================
+        // 5. FORM SUBMISSION & INTERACTIONS
+        // ==========================================
+        document.getElementById('patrolForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const submitBtn = document.getElementById('submitBtn');
+            const officerName = document.getElementById('officerName').value.trim();
+            const unit = document.getElementById('unitSelect').value;
+            const area = document.getElementById('patrolArea').value.trim();
+            const startTime = document.getElementById('startTime').value;
+            const endTime = document.getElementById('endTime').value;
+            const areaScore = parseInt(document.getElementById('areaScore').value, 10);
+            const unitScore = parseInt(document.getElementById('unitScore').value, 10);
+            const notes = document.getElementById('patrolNotes').value.trim();
+
+            if (!officerName || !area) return;
+
+            // Save officer name for convenience
+            try { localStorage.setItem('lynnwood_officer_name', officerName); } catch (err) {}
+
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>กำลังส่งข้อมูลเข้าศูนย์วิทยุ...</span>';
+
+            const payload = {
+                officerName,
+                unit,
+                area,
+                startTime,
+                endTime,
+                areaScore,
+                unitScore,
+                totalScore: areaScore + unitScore,
+                notes: notes || 'เหตุการณ์ปกติ ไม่พบสิ่งผิดกฎหมาย',
+                imageData: compressedBase64 || null,
+                likes: 0,
+                authorUid: currentUser ? currentUser.uid : 'local-user',
+                createdAt: Date.now(),
+                dateStr: new Date().toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: '2-digit' })
+            };
+
+            try {
+                if (isFirebaseReady && currentUser) {
+                    const logsRef = collection(db, 'artifacts', appId, 'public', 'data', 'patrol_logs');
+                    await addDoc(logsRef, payload);
+                } else {
+                    allLogs.unshift({ id: 'local-' + Date.now(), ...payload });
+                    renderAll();
+                }
+
+                playRadioBeep('success');
+                triggerSirenVisual();
+                showToast('บันทึกสำเร็จ!', `ซิงค์ข้อมูลออกตรวจพื้นที่ ${area} เรียบร้อยแล้ว`, 'success');
+
+                // Reset form fields except officer name & unit
+                document.getElementById('patrolNotes').value = '';
+                clearImage();
+                fillCurrentTime();
+                switchTab('feed');
+            } catch (err) {
+                console.error('Save error:', err);
+                showToast('เกิดข้อผิดพลาด', 'ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่', 'alert');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> <span>บันทึกและซิงค์ข้อมูลทันที</span>';
+            }
+        });
+
+        // Upvote / Bonus Support Point
+        window.endorseLog = async function(logId) {
+            playRadioBeep('click');
+            if (isFirebaseReady && currentUser) {
+                try {
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'patrol_logs', logId);
+                    await updateDoc(docRef, { likes: increment(1) });
+                    showToast('ส่งกำลังใจแล้ว', '+1 คะแนนสนับสนุนให้เพื่อนร่วมงาน', 'success');
+                } catch (e) {
+                    console.error(e);
+                }
+            } else {
+                const target = allLogs.find(x => x.id === logId);
+                if (target) { target.likes = (target.likes || 0) + 1; renderAll(); }
+            }
+        };
+
+        // Delete Modal Handlers
+        window.askDeleteLog = function(logId) {
+            pendingDeleteId = logId;
+            document.getElementById('deleteModal').classList.remove('hidden');
+        };
+        window.closeDeleteModal = function() {
+            pendingDeleteId = null;
+            document.getElementById('deleteModal').classList.add('hidden');
+        };
+        document.getElementById('confirmDeleteBtn').addEventListener('click', async () => {
+            if (!pendingDeleteId) return;
+            const idToDelete = pendingDeleteId;
+            closeDeleteModal();
+
+            if (isFirebaseReady && currentUser) {
+                try {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'patrol_logs', idToDelete));
+                    showToast('ลบรายการแล้ว', 'อัปเดตข้อมูลให้ทุกคนตรงกันเรียบร้อย', 'info');
+                } catch (e) {
+                    console.error(e);
+                }
+            } else {
+                allLogs = allLogs.filter(x => x.id !== idToDelete);
+                renderAll();
+            }
+        });
+
+        // ==========================================
+        // 6. LEADERBOARD CALCULATION & RENDERING
+        // ==========================================
+        function computeUnitRankings() {
+            const stats = UNITS.map(u => ({
+                ...u,
+                patrolCount: 0,
+                rawScoreSum: 0,
+                bonusLikes: 0,
+                finalPoints: 0,
+                avgScore: 0
+            }));
+
+            allLogs.forEach(log => {
+                const found = stats.find(s => s.name === log.unit);
+                if (found) {
+                    found.patrolCount += 1;
+                    found.rawScoreSum += Number(log.totalScore || 0);
+                    found.bonusLikes += Number(log.likes || 0);
+                }
+            });
+
+            stats.forEach(s => {
+                // Total Points = Sum of evaluation scores + (likes * 2)
+                s.finalPoints = s.rawScoreSum + (s.bonusLikes * 2);
+                s.avgScore = s.patrolCount > 0 ? (s.rawScoreSum / s.patrolCount).toFixed(1) : '0.0';
+            });
+
+            // Sort descending by finalPoints, then patrolCount
+            stats.sort((a, b) => b.finalPoints - a.finalPoints || b.patrolCount - a.patrolCount);
+            return stats;
+        }
+
+        function renderLeaderboard() {
+            const ranked = computeUnitRankings();
+            const podiumEl = document.getElementById('podiumContainer');
+            const allListEl = document.getElementById('allUnitsList');
+
+            const first = ranked[0];
+            const second = ranked[1];
+            const third = ranked[2];
+
+            // Order visually: 2nd (Left), 1st (Center - Tallest), 3rd (Right)
+            podiumEl.innerHTML = `
+                <!-- 2nd Place (Silver) -->
+                <div class="flex flex-col items-center">
+                    <div class="w-11 h-11 rounded-full bg-slate-800 border-2 border-slate-300 flex items-center justify-center text-xl shadow-md mb-1.5 relative">
+                        ${second.icon}
+                        <span class="absolute -bottom-1.5 px-1.5 py-0.2 rounded-full bg-slate-300 text-slate-950 font-mono text-[10px] font-bold">#2</span>
+                    </div>
+                    <p class="text-[11px] sm:text-xs font-bold text-slate-200 text-center truncate w-full px-1">${second.short}</p>
+                    <p class="text-[10px] font-mono text-slate-400 mb-1.5">${second.finalPoints} แต้ม</p>
+                    <div class="w-full h-16 rounded-t-xl bg-gradient-to-t from-slate-800/90 to-slate-500/30 border-t-2 border-slate-300 flex flex-col items-center justify-center p-1">
+                        <span class="text-xs font-mono font-bold text-slate-200">${second.patrolCount} รอบ</span>
+                        <span class="text-[9px] text-slate-400">เฉลี่ย ${second.avgScore}</span>
+                    </div>
+                </div>
+
+                <!-- 1st Place (Gold) -->
+                <div class="flex flex-col items-center">
+                    <i class="fa-solid fa-crown text-amber-400 text-base mb-1 animate-bounce"></i>
+                    <div class="w-14 h-14 rounded-full bg-amber-950/80 border-2 border-amber-400 flex items-center justify-center text-2xl shadow-lg shadow-amber-500/30 mb-1.5 relative">
+                        ${first.icon}
+                        <span class="absolute -bottom-1.5 px-2 py-0.2 rounded-full bg-amber-400 text-slate-950 font-mono text-[10px] font-bold">#1</span>
+                    </div>
+                    <p class="text-xs sm:text-sm font-bold text-amber-300 text-center truncate w-full px-1">${first.short}</p>
+                    <p class="text-[11px] font-mono font-bold text-amber-400 mb-1.5">${first.finalPoints} แต้ม</p>
+                    <div class="w-full h-24 rounded-t-xl bg-gradient-to-t from-amber-950/90 to-amber-500/35 border-t-2 border-amber-400 flex flex-col items-center justify-center p-1 shadow-inner">
+                        <span class="text-xs font-mono font-bold text-amber-200">${first.patrolCount} รอบ</span>
+                        <span class="text-[10px] text-amber-300/80">เฉลี่ย ${first.avgScore}</span>
+                    </div>
+                </div>
+
+                <!-- 3rd Place (Bronze) -->
+                <div class="flex flex-col items-center">
+                    <div class="w-11 h-11 rounded-full bg-orange-950/70 border-2 border-amber-700 flex items-center justify-center text-xl shadow-md mb-1.5 relative">
+                        ${third.icon}
+                        <span class="absolute -bottom-1.5 px-1.5 py-0.2 rounded-full bg-amber-700 text-white font-mono text-[10px] font-bold">#3</span>
+                    </div>
+                    <p class="text-[11px] sm:text-xs font-bold text-amber-200/90 text-center truncate w-full px-1">${third.short}</p>
+                    <p class="text-[10px] font-mono text-slate-400 mb-1.5">${third.finalPoints} แต้ม</p>
+                    <div class="w-full h-12 rounded-t-xl bg-gradient-to-t from-orange-950/80 to-amber-700/30 border-t-2 border-amber-700 flex flex-col items-center justify-center p-1">
+                        <span class="text-xs font-mono font-bold text-amber-200/90">${third.patrolCount} รอบ</span>
+                        <span class="text-[9px] text-slate-400">เฉลี่ย ${third.avgScore}</span>
+                    </div>
+                </div>
+            `;
+
+            // Render Full 7-Unit List
+            allListEl.innerHTML = ranked.map((u, idx) => `
+                <div class="flex items-center justify-between px-3 py-2 rounded-xl bg-tactical-950/70 border border-slate-800/80 text-xs">
+                    <div class="flex items-center gap-2.5">
+                        <span class="w-5 h-5 rounded-md font-mono text-[11px] font-bold flex items-center justify-center ${idx === 0 ? 'bg-amber-400 text-slate-950' : idx === 1 ? 'bg-slate-300 text-slate-950' : idx === 2 ? 'bg-amber-700 text-white' : 'bg-slate-800 text-slate-400'}">
+                            ${idx + 1}
+                        </span>
+                        <span>${u.icon}</span>
+                        <span class="font-medium text-slate-200">${u.name}</span>
+                    </div>
+                    <div class="flex items-center gap-3 font-mono text-[11px]">
+                        <span class="text-slate-400">${u.patrolCount} รอบ</span>
+                        <span class="font-bold text-amber-400">${u.finalPoints} แต้ม</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // ==========================================
+        // 7. FEED RENDERING & LINE SHARE FORMATTING
+        // ==========================================
+        function renderFeed() {
+            const container = document.getElementById('patrolFeedList');
+            const badge = document.getElementById('feedBadgeCount');
+            badge.textContent = allLogs.length;
+
+            const filtered = activeFilterUnit === 'ALL'
+                ? allLogs
+                : allLogs.filter(item => item.unit === activeFilterUnit);
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="tactical-card rounded-2xl p-8 text-center space-y-2">
+                        <i class="fa-solid fa-walkie-talkie text-3xl text-slate-600"></i>
+                        <p class="text-sm font-medium text-slate-300">ยังไม่มีบันทึกการออกตรวจในหมวดนี้</p>
+                        <p class="text-xs text-slate-500">กดที่แท็บ "ลงบันทึกออกตรวจ" เพื่อส่งรายงานแรกเข้าศูนย์วิทยุ</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = filtered.map(log => {
+                const unitObj = UNITS.find(u => u.name === log.unit) || { icon: '🚓' };
+                const scoreColor = log.totalScore >= 18 ? 'text-emerald-400 border-emerald-500/40 bg-emerald-500/10' : log.totalScore >= 14 ? 'text-amber-400 border-amber-500/40 bg-amber-500/10' : 'text-red-400 border-red-500/40 bg-red-500/10';
+
+                return `
+                <article class="tactical-card rounded-2xl p-4 space-y-3 border-l-4 ${log.totalScore >= 18 ? 'border-l-amber-400' : 'border-l-blue-500'}">
+                    <!-- Header Row -->
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="flex items-center gap-2.5 min-w-0">
+                            <div class="w-10 h-10 rounded-xl bg-tactical-800 border border-blue-500/30 flex items-center justify-center text-lg flex-shrink-0">
+                                ${unitObj.icon}
+                            </div>
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                    <span class="text-xs font-bold text-amber-400">${escapeHTML(log.unit)}</span>
+                                    <span class="text-[10px] text-slate-500">•</span>
+                                    <span class="text-xs font-semibold text-white truncate">${escapeHTML(log.officerName)}</span>
+                                </div>
+                                <p class="text-[11px] font-mono text-cyan-400 mt-0.5">
+                                    <i class="fa-regular fa-clock mr-1"></i>${escapeHTML(log.startTime || '--:--')} - ${escapeHTML(log.endTime || '--:--')} (${escapeHTML(log.dateStr || '')})
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-1.5 flex-shrink-0">
+                            <span class="px-2.5 py-1 rounded-lg border font-mono text-xs font-bold ${scoreColor}">
+                                ${log.totalScore}/20
+                            </span>
+                            <button type="button" onclick="askDeleteLog('${log.id}')" title="ลบรายการ"
+                                class="w-8 h-8 rounded-lg bg-slate-900 hover:bg-red-950/60 text-slate-500 hover:text-red-400 flex items-center justify-center transition">
+                                <i class="fa-solid fa-trash-can text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Location & Sub-scores -->
+                    <div class="bg-tactical-950/80 rounded-xl p-3 border border-slate-800/80 space-y-1.5">
+                        <div class="flex items-center gap-1.5 text-xs font-semibold text-white">
+                            <i class="fa-solid fa-location-dot text-red-400"></i>
+                            <span>พื้นที่: ${escapeHTML(log.area)}</span>
+                        </div>
+                        <p class="text-xs text-slate-300 leading-relaxed pl-4">${escapeHTML(log.notes)}</p>
+                        <div class="flex items-center gap-3 pt-1 pl-4 text-[11px] font-mono text-slate-400">
+                            <span>ความเรียบร้อย: <strong class="text-cyan-400">${log.areaScore}/10</strong></span>
+                            <span>ความพร้อมหน่วย: <strong class="text-amber-400">${log.unitScore}/10</strong></span>
+                        </div>
+                    </div>
+
+                    <!-- Attached Evidence Photo -->
+                    ${log.imageData ? `
+                        <div class="relative rounded-xl overflow-hidden border border-slate-700/80 bg-black/40 cursor-pointer group"
+                             onclick="openImageModal('${log.id}')">
+                            <img src="${log.imageData}" alt="ภาพการออกตรวจ" loading="lazy" class="w-full max-h-64 object-cover group-hover:scale-[1.01] transition duration-300">
+                            <div class="absolute bottom-2 right-2 px-2.5 py-1 rounded-lg bg-black/75 backdrop-blur-sm text-[10px] text-white flex items-center gap-1">
+                                <i class="fa-solid fa-magnifying-glass-plus text-amber-400"></i> แตะเพื่อขยายภาพ
+                            </div>
+                        </div>
+                    ` : ''}
+
+                    <!-- Footer Action Buttons: Endorse & Copy for LINE -->
+                    <div class="flex items-center justify-between gap-2 pt-1">
+                        <button type="button" onclick="endorseLog('${log.id}')"
+                            class="px-3 py-2 rounded-xl bg-tactical-800 hover:bg-blue-900/50 border border-blue-500/30 text-xs font-medium text-blue-300 flex items-center gap-1.5 active:scale-95 transition">
+                            <i class="fa-solid fa-thumbs-up text-amber-400"></i>
+                            <span>เยี่ยมมาก</span>
+                            <span class="px-1.5 py-0.2 rounded bg-blue-500/20 font-mono text-[11px] text-white">${log.likes || 0}</span>
+                        </button>
+
+                        <button type="button" onclick="copySingleLine('${log.id}')"
+                            class="px-3.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/50 text-emerald-300 text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition">
+                            <i class="fa-brands fa-line text-base text-emerald-400"></i>
+                            <span>คัดลอกส่ง LINE</span>
+                        </button>
+                    </div>
+                </article>
+                `;
+            }).join('');
+        }
+
+        function renderAll() {
+            renderLeaderboard();
+            renderFeed();
+        }
+
+        // ==========================================
+        // 8. LINE CLIPBOARD COPY (iOS / ANDROID / LINE IN-APP SAFE)
+        // ==========================================
+        function copyTextToClipboard(text) {
+            // Reliable fallback using temporary textarea + execCommand for LINE WebView & iFrames
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.top = '0';
+            textArea.style.left = '0';
+            textArea.style.width = '2em';
+            textArea.style.height = '2em';
+            textArea.style.padding = '0';
+            textArea.style.border = 'none';
+            textArea.style.outline = 'none';
+            textArea.style.boxShadow = 'none';
+            textArea.style.background = 'transparent';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+
+            let success = false;
+            try {
+                success = document.execCommand('copy');
+            } catch (err) {
+                console.warn('execCommand copy failed:', err);
+            }
+            document.body.removeChild(textArea);
+
+            if (!success && navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).catch(() => {});
+            }
+
+            playRadioBeep('success');
+            showToast('คัดลอกข้อความสำเร็จ!', 'พร้อมนำไปวางส่งในกลุ่ม LINE ได้ทันที', 'success');
+        }
+
+        window.copySingleLine = function(logId) {
+            const log = allLogs.find(x => x.id === logId);
+            if (!log) return;
+
+            const msg = [
+                `🚔 รายงานการออกตรวจ สภ. LYNNWOOD`,
+                `━━━━━━━━━━━━━━━━━━`,
+                `🛡️ หน่วยงาน: ${log.unit}`,
+                `👮 เจ้าหน้าที่: ${log.officerName}`,
+                `📍 พื้นที่: ${log.area}`,
+                `⏰ เวลา: ${log.startTime} - ${log.endTime} น. (${log.dateStr})`,
+                `⭐ คะแนนประเมิน: ${log.totalScore}/20 คะแนน`,
+                `   • ความเรียบร้อยพื้นที่: ${log.areaScore}/10`,
+                `   • ความพร้อมหน่วยงาน: ${log.unitScore}/10`,
+                `📝 หมายเหตุ: ${log.notes}`,
+                `━━━━━━━━━━━━━━━━━━`,
+                `#OneState #สภLynnwood`
+            ].join('\n');
+
+            copyTextToClipboard(msg);
+        };
+
+        document.getElementById('copyAllLineBtn').addEventListener('click', () => {
+            const ranked = computeUnitRankings();
+            const top3Text = ranked.slice(0, 3).map((u, i) => {
+                const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉';
+                return `${medal} อันดับ ${i + 1}: ${u.name} (${u.finalPoints} แต้ม | ${u.patrolCount} รอบ)`;
+            }).join('\n');
+
+            const recentLogs = allLogs.slice(0, 5).map((l, idx) =>
+                `${idx + 1}. [${l.unit}] ${l.area} โดย ${l.officerName} (${l.startTime}-${l.endTime}) [${l.totalScore}/20]`
+            ).join('\n');
+
+            const summary = [
+                `🚨 สรุปรายงานการออกตรวจ สภ. LYNNWOOD`,
+                `📅 วันที่: ${new Date().toLocaleDateString('th-TH', { dateStyle: 'medium' })}`,
+                `📊 ยอดออกตรวจสะสมทั้งหมด: ${allLogs.length} รอบ`,
+                ``,
+                `🏆 อันดับหน่วยงานดีเด่น (TOP 3):`,
+                top3Text,
+                ``,
+                `📋 รายการออกตรวจล่าสุด:`,
+                recentLogs || '- ยังไม่มีรายการ -',
+                ``,
+                `#OneState #สภLynnwood #ศูนย์วิทยุ`
+            ].join('\n');
+
+            copyTextToClipboard(summary);
+        });
+
+        // ==========================================
+        // 9. UI HELPERS & INITIALIZATION
+        // ==========================================
+        function escapeHTML(str) {
+            if (!str) return '';
+            return String(str).replace(/[&<>"']/g, m => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[m]));
+        }
+
+        window.setArea = function(areaText) {
+            document.getElementById('patrolArea').value = areaText;
+            playRadioBeep('click');
+        };
+
+        window.fillCurrentTime = function() {
+            const now = new Date();
+            const hh = String(now.getHours()).padStart(2, '0');
+            const mm = String(now.getMinutes()).padStart(2, '0');
+            const timeStr = `${hh}:${mm}`;
+
+            const startEl = document.getElementById('startTime');
+            const endEl = document.getElementById('endTime');
+            if (!startEl.value) startEl.value = timeStr;
+            endEl.value = timeStr;
+            playRadioBeep('click');
+        };
+
+        window.updateScoreDisplay = function() {
+            const a = parseInt(document.getElementById('areaScore').value, 10);
+            const u = parseInt(document.getElementById('unitScore').value, 10);
+            document.getElementById('areaScoreVal').textContent = a;
+            document.getElementById('unitScoreVal').textContent = u;
+            document.getElementById('totalScoreBadge').textContent = `รวม ${a + u} / 20 คะแนน`;
+        };
+
+        window.setFilterUnit = function(unitName) {
+            activeFilterUnit = unitName;
+            document.querySelectorAll('.filter-pill').forEach(btn => {
+                if (btn.dataset.unit === unitName) {
+                    btn.className = 'filter-pill active px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap bg-amber-500 text-slate-950 transition';
+                } else {
+                    btn.className = 'filter-pill px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap bg-tactical-900 text-slate-300 border border-slate-800 transition';
+                }
+            });
+            playRadioBeep('click');
+            renderFeed();
+        };
+
+        window.switchTab = function(tab) {
+            const formSec = document.getElementById('sectionForm');
+            const feedSec = document.getElementById('sectionFeed');
+            const btnForm = document.getElementById('tabBtnForm');
+            const btnFeed = document.getElementById('tabBtnFeed');
+
+            if (tab === 'form') {
+                formSec.classList.remove('hidden');
+                feedSec.classList.add('hidden');
+                btnForm.className = 'py-2.5 px-3 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-md transition';
+                btnFeed.className = 'py-2.5 px-3 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 text-slate-300 hover:text-white transition relative';
+            } else {
+                formSec.classList.add('hidden');
+                feedSec.classList.remove('hidden');
+                btnFeed.className = 'py-2.5 px-3 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-md transition relative';
+                btnForm.className = 'py-2.5 px-3 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 text-slate-300 hover:text-white transition';
+            }
+        };
+
+        window.openImageModal = function(logId) {
+            const log = allLogs.find(x => x.id === logId);
+            if (!log || !log.imageData) return;
+            document.getElementById('modalFullImage').src = log.imageData;
+            document.getElementById('modalCaption').textContent = `${log.unit} • ${log.area} (${log.startTime} - ${log.endTime})`;
+            document.getElementById('imageModal').classList.remove('hidden');
+        };
+
+        window.closeImageModal = function() {
+            document.getElementById('imageModal').classList.add('hidden');
+        };
+
+        document.getElementById('soundToggleBtn').addEventListener('click', () => {
+            soundEnabled = !soundEnabled;
+            const icon = document.getElementById('soundIcon');
+            if (soundEnabled) {
+                icon.className = 'fa-solid fa-volume-high text-sm';
+                playRadioBeep('success');
+                showToast('เปิดเสียงวิทยุสื่อสาร', 'แจ้งเตือนเมื่อมีรายงานใหม่เข้ามา', 'info');
+            } else {
+                icon.className = 'fa-solid fa-volume-xmark text-sm text-slate-500';
+                showToast('ปิดเสียงแจ้งเตือนชั่วคราว', 'ยังคงแสดงการแจ้งเตือนบนหน้าจอ', 'info');
+            }
+        });
+
+        // Boot Application
+        window.addEventListener('DOMContentLoaded', () => {
+            // Restore saved officer name
+            try {
+                const savedName = localStorage.getItem('lynnwood_officer_name');
+                if (savedName) document.getElementById('officerName').value = savedName;
+            } catch (e) {}
+
+            fillCurrentTime();
+            updateScoreDisplay();
+            // Show both form & feed cleanly on desktop, or default to form on mobile
+            if (window.innerWidth >= 640) {
+                document.getElementById('sectionForm').classList.remove('hidden');
+                document.getElementById('sectionFeed').classList.remove('hidden');
+            } else {
+                switchTab('form');
+            }
+
+            initRealtimeSync();
+        });
+    </script>
+</body>
+</html>
